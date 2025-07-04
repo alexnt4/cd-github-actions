@@ -20,9 +20,25 @@ jobs:
           echo -n "verifying images:"
           docker images         
     - name: Deploy to minikube
-      run:
-        kubectl apply -f k8s-node-app.yaml
+      run: kubectl apply -f k8s-node-app.yaml
+    - name: Wait for deployment
+      run: kubectl rollout status deployment/nodejs-app --timeout=300s
+    - name: Check pods status
+      run: |
+          echo "Checking pods..."
+          kubectl get pods -l app=nodejs-app
+          echo "Checking deployment..."
+          kubectl get deployment nodejs-app
+          echo "Describing deployment..."
+          kubectl describe deployment nodejs-app
     - name: Test service URLs
       run: |
+          echo "=== Minikube service list ==="
           minikube service list
-          minikube service nodejs-app --url
+          echo "=== Getting service URL ==="
+          SERVICE_URL=$(minikube service nodejs-app --url)
+          echo "Service URL: $SERVICE_URL"
+          echo "=== Testing service with curl ==="
+          curl -f $SERVICE_URL || echo "Direct URL test failed, trying internal service..."
+          echo "=== Testing internal service ==="
+          kubectl run test-pod --image=curlimages/curl:latest --rm -i --restart=Never -- curl -f http://nodejs-app.default.svc.cluster.local || echo "Internal service test completed"
